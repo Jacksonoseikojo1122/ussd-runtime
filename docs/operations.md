@@ -20,7 +20,14 @@ USSD networks give each reply only a few seconds before dropping the session; Hu
 
 Menus only, with no backend calls (`-keys 3`): about 31,000 requests/s, with p99 at 6.2 ms on Africa's Talking.
 
-**GitHub runner:** CI runs the same test on every push, with sessions in a real Redis, and posts the table in the run summary. See the "load-test" job on the [Actions tab](https://github.com/Jacksonoseikojo1122/ussd-runtime/actions).
+**GitHub runner:** CI runs the same test on every push and posts the table in the run summary. The setup is a standard `ubuntu-latest` runner, sessions in a real Redis 7, 50 callers and 20 s per row. These are the numbers from the [first run](https://github.com/Jacksonoseikojo1122/ussd-runtime/actions/runs/38850384774):
+
+| Gateway | Requests/s | p50 | p95 | p99 | Max | Errors |
+| --- | --- | --- | --- | --- | --- | --- |
+| Africa's Talking | 17,116 | 2.62 ms | 5.76 ms | 7.73 ms | 21.11 ms | 0 |
+| Hubtel | 16,906 | 2.67 ms | 5.77 ms | 7.48 ms | 15.98 ms | 0 |
+| Nalo | 16,538 | 2.72 ms | 5.92 ms | 7.75 ms | 16.80 ms | 0 |
+| Arkesel | 15,334 | 2.90 ms | 6.55 ms | 8.79 ms | 49.84 ms | 0 |
 
 **What the load test caught.** The first run had p99 at about 830 ms and a worst case of about 6 seconds. That is long enough to drop real sessions. The cause was Go's default HTTP client, which keeps only 2 idle connections per host. With 50 callers, almost every backend call opened a new TCP connection. The runtime now keeps up to 256 connections open per backend host. That one change took p99 from about 830 ms to about 10 ms.
 
