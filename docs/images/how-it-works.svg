@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" font-family="system-ui, -apple-system, Segoe UI, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">How USSD Runtime works</title>
+  <desc id="d">A caller dials a USSD code. The network passes it to a gateway such as Africa's Talking, Hubtel, Nalo or Arkesel, which posts to the runtime. The runtime loads the session from Redis, runs the flow, calls your backend if the screen has an action, saves the session and replies in the gateway's format.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6b6a64"/></marker>
+    <style>
+      .box{fill:#fff;stroke:#d8d5cb;stroke-width:1.5}
+      .key{fill:#e8f3ee;stroke:#0b6e4f;stroke-width:1.5}
+      .src{fill:#fff6e0;stroke:#d9b45a;stroke-width:1.5}
+      .h{font-size:15px;font-weight:700;fill:#1d1d1b}
+      .s{font-size:12px;fill:#55544e}
+      .l{stroke:#6b6a64;stroke-width:1.5;fill:none;marker-end:url(#a)}
+      .t{font-size:11px;fill:#0b6e4f;font-weight:600}
+    </style>
+  </defs>
+  <rect width="960" height="360" fill="#f7f6f2"/>
+
+  <rect class="box" x="20" y="120" width="140" height="110" rx="10"/>
+  <text class="h" x="35" y="148">Caller</text>
+  <text class="s" x="35" y="170">dials *384#</text>
+  <text class="s" x="35" y="188">any phone,</text>
+  <text class="s" x="35" y="206">no data needed</text>
+
+  <rect class="box" x="200" y="120" width="170" height="110" rx="10"/>
+  <text class="h" x="215" y="148">Gateway</text>
+  <text class="s" x="215" y="170">Africa's Talking, Hubtel,</text>
+  <text class="s" x="215" y="188">Nalo or Arkesel</text>
+  <text class="s" x="215" y="206">posts each step</text>
+
+  <rect class="key" x="410" y="60" width="230" height="230" rx="10"/>
+  <text class="h" x="425" y="88">USSD Runtime</text>
+  <text class="s" x="425" y="112">1. adapter reads the gateway's format</text>
+  <text class="s" x="425" y="134">2. load the session</text>
+  <text class="s" x="425" y="156">3. run the flow: menu, input</text>
+  <text class="s" x="440" y="174">check, {{variables}}</text>
+  <text class="s" x="425" y="196">4. action? call your backend</text>
+  <text class="s" x="440" y="214">(signed, 2 s budget)</text>
+  <text class="s" x="425" y="236">5. save the session</text>
+  <text class="s" x="425" y="258">6. reply in the gateway's format</text>
+  <text class="t" x="425" y="280">p99 ≈ 10 ms with 2 backend calls</text>
+
+  <rect class="src" x="690" y="40" width="250" height="100" rx="10"/>
+  <text class="h" x="705" y="68">Sessions</text>
+  <text class="s" x="705" y="90">Redis (several instances)</text>
+  <text class="s" x="705" y="108">or memory (one instance)</text>
+  <text class="s" x="705" y="126">expire after 180 s idle</text>
+
+  <rect class="box" x="690" y="200" width="250" height="110" rx="10"/>
+  <text class="h" x="705" y="228">Your backend</text>
+  <text class="s" x="705" y="250">gets session + variables,</text>
+  <text class="s" x="705" y="268">returns variables or a</text>
+  <text class="s" x="705" y="286">screen it's allowed to send to</text>
+
+  <path class="l" d="M160 175H196"/>
+  <path class="l" d="M370 175H406"/>
+  <path class="l" d="M640 110C665 110 665 90 686 90"/>
+  <path class="l" d="M640 230C665 230 665 255 686 255"/>
+  <path class="l" d="M410 265C330 300 290 290 285 234"/>
+  <text class="s" x="300" y="312">CON / END reply</text>
+</svg>

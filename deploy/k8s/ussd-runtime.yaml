@@ -1,0 +1,50 @@
+# Two replicas sharing sessions in Redis. Create the secret first:
+#   kubectl create secret generic ussd-runtime --from-literal=REDIS_URL=redis://... \
+#     --from-literal=GATEWAY_TOKEN=... --from-literal=ACTION_SECRET=... --from-file=flow.json=./flows/your-flow.json
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ussd-runtime
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: ussd-runtime }
+  template:
+    metadata:
+      labels: { app: ussd-runtime }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext: { runAsNonRoot: true }
+      containers:
+        - name: ussd-runtime
+          image: ghcr.io/jacksonoseikojo1122/ussd-runtime:v0.1.0
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: FLOW_FILE, value: /config/flow.json }
+            - name: REDIS_URL
+              valueFrom: { secretKeyRef: { name: ussd-runtime, key: REDIS_URL } }
+            - name: GATEWAY_TOKEN
+              valueFrom: { secretKeyRef: { name: ussd-runtime, key: GATEWAY_TOKEN } }
+            - name: ACTION_SECRET
+              valueFrom: { secretKeyRef: { name: ussd-runtime, key: ACTION_SECRET } }
+          volumeMounts: [{ name: flow, mountPath: /config, readOnly: true }]
+          readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 10 }
+          resources:
+            requests: { cpu: 50m, memory: 32Mi }
+            limits: { cpu: 500m, memory: 128Mi }
+          securityContext: { readOnlyRootFilesystem: true, allowPrivilegeEscalation: false }
+      volumes:
+        - name: flow
+          secret: { secretName: ussd-runtime, items: [{ key: flow.json, path: flow.json }] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ussd-runtime
+spec:
+  selector: { app: ussd-runtime }
+  ports: [{ port: 80, targetPort: 8080 }]

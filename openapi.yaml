@@ -1,0 +1,225 @@
+openapi: 3.1.0
+info:
+  title: USSD Runtime
+  version: 0.1.0
+  summary: Runs USSD menu flows for Africa's Talking, Hubtel, Nalo and Arkesel, with sessions in Redis and signed calls to your backend.
+  description: |
+    Each gateway posts to its own endpoint in its own format; the runtime answers in that format.
+    Flows are JSON (USSD Flow Studio's format plus input screens, variables and actions).
+    If GATEWAY_TOKEN is set, gateway requests need `?token=` or an `X-Gateway-Token` header.
+    Calls the runtime makes to your backend are described under `webhooks`.
+  contact: { name: Jackson Kojo Osei, url: "https://jacksonkojoosei.com/projects/ussd-runtime" }
+  license: { name: MIT, identifier: MIT }
+servers:
+  - url: http://localhost:8080
+paths:
+  /ussd/africastalking:
+    post:
+      summary: Africa's Talking callback
+      parameters: [{ $ref: "#/components/parameters/Token" }]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId: { type: string }
+                phoneNumber: { type: string, example: "+233241234567" }
+                networkCode: { type: string, example: "62001" }
+                serviceCode: { type: string, example: "*384#" }
+                text: { type: string, description: "Empty on the first request, then every input so far joined with *", example: "1*1001" }
+      responses:
+        "200":
+          description: "CON <text> to continue, END <text> to close"
+          content: { text/plain: { example: "CON Welcome to Demo Wallet\n1. Buy airtime\n2. Check balance\n3. Exit" } }
+        "400": { description: Missing sessionId }
+        "403": { description: Wrong or missing gateway token }
+  /ussd/hubtel:
+    post:
+      summary: Hubtel programmable services callback
+      parameters: [{ $ref: "#/components/parameters/Token" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [SessionId, Type]
+              properties:
+                SessionId: { type: string }
+                Mobile: { type: string }
+                ServiceCode: { type: string }
+                Type: { type: string, enum: [Initiation, Response, Release, Timeout] }
+                Message: { type: string, description: The latest input }
+                Operator: { type: string }
+                Sequence: { type: integer }
+                ClientState: { type: string }
+                Platform: { type: string }
+      responses:
+        "200":
+          description: Next screen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  SessionId: { type: string }
+                  Type: { type: string, enum: [Response, Release] }
+                  Message: { type: string }
+                  Label: { type: string, description: Screen id }
+                  DataType: { type: string, enum: [menu, input, display] }
+                  FieldType: { type: string, enum: [text, number, decimal, phone] }
+        "400": { description: Missing SessionId or invalid JSON }
+        "403": { description: Wrong or missing gateway token }
+  /ussd/nalo:
+    post:
+      summary: Nalo USSD callback
+      parameters: [{ $ref: "#/components/parameters/Token" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                USERID: { type: string }
+                MSISDN: { type: string }
+                USERDATA: { type: string, description: The latest input }
+                MSGTYPE: { description: "true or 1 on the first request", oneOf: [{ type: boolean }, { type: integer, enum: [0, 1] }] }
+                NETWORK: { type: string }
+                SESSIONID: { type: string, description: "If missing, MSISDN is used" }
+      responses:
+        "200":
+          description: Next screen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  USERID: { type: string }
+                  MSISDN: { type: string }
+                  USERDATA: { type: string }
+                  MSG: { type: string, description: "At most 120 characters on Nalo" }
+                  MSGTYPE: { type: boolean, description: "true = continue, false = end" }
+        "400": { description: Invalid JSON or no session id }
+        "403": { description: Wrong or missing gateway token }
+  /ussd/arkesel:
+    post:
+      summary: Arkesel USSD callback
+      parameters: [{ $ref: "#/components/parameters/Token" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionID]
+              properties:
+                sessionID: { type: string }
+                userID: { type: string }
+                newSession: { type: boolean }
+                msisdn: { type: string }
+                userData: { type: string, description: "The code dialled on the first request, then the latest input" }
+                network: { type: string }
+      responses:
+        "200":
+          description: Next screen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionID: { type: string }
+                  userID: { type: string }
+                  msisdn: { type: string }
+                  message: { type: string }
+                  continueSession: { type: boolean }
+        "400": { description: Invalid JSON or missing sessionID }
+        "403": { description: Wrong or missing gateway token }
+  /sim:
+    post:
+      summary: Drive the flow from the simulator (only when SIMULATOR=on)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id]
+              properties:
+                session_id: { type: string }
+                input: { type: string }
+                new: { type: boolean }
+      responses:
+        "200":
+          description: The reply and how long it took
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reply: { $ref: "#/components/schemas/Reply" }
+                  ms: { type: number }
+  /healthz:
+    get:
+      summary: Liveness and session store check
+      responses:
+        "200": { description: ok }
+        "503": { description: Session store unreachable }
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        "200": { description: Prometheus text format, content: { text/plain: {} } }
+webhooks:
+  action:
+    post:
+      summary: Call the runtime makes to your backend when a caller reaches a screen with an action
+      description: |
+        Verify `X-USSD-Signature`: `v1=` + hex HMAC-SHA256 of `<X-USSD-Timestamp>.<raw body>` with ACTION_SECRET.
+        Reply within the action's timeout_ms (default 2000).
+      parameters:
+        - { name: X-USSD-Timestamp, in: header, required: true, schema: { type: string } }
+        - { name: X-USSD-Signature, in: header, required: true, schema: { type: string, example: "v1=5d1c0e..." } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id: { type: string }
+                gateway: { type: string }
+                phone: { type: string, example: "233241234567" }
+                network: { type: string }
+                screen: { type: string }
+                vars: { type: object, additionalProperties: { type: string } }
+      responses:
+        "200":
+          description: Variables to set and, optionally, a screen from the action's can_go_to list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vars: { type: object, additionalProperties: { type: string, maxLength: 160 } }
+                  next: { type: string }
+              example: { vars: { student_name: Ama Mensah, balance: "1,250.00" } }
+components:
+  parameters:
+    Token:
+      name: token
+      in: query
+      required: false
+      schema: { type: string }
+      description: Required when GATEWAY_TOKEN is set (or send X-Gateway-Token)
+  schemas:
+    Reply:
+      type: object
+      properties:
+        end: { type: boolean }
+        message: { type: string }
+        screen: { type: string }
+        kind: { type: string, enum: [menu, input, end] }
+        input_type: { type: string, enum: [text, digits, amount, phone_gh] }

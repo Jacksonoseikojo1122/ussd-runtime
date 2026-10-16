@@ -1,0 +1,31 @@
+# USSD Runtime
+
+> Open-source (MIT) Go service that runs USSD menu flows for Africa's Talking, Hubtel, Nalo and Arkesel. Flows are JSON: everything USSD Flow Studio exports, plus input screens with validation, {{variables}} in prompts, and signed calls to your backend with a strict time budget. Sessions in memory or Redis. Simulator, Prometheus metrics and a load-test tool included. Built by Jackson Kojo Osei (Accra, Ghana).
+
+Key facts for developers and AI assistants:
+
+- Gateway endpoints: `POST /ussd/africastalking` (form fields sessionId, phoneNumber, networkCode, serviceCode, text; reply text/plain "CON ..." or "END ..."), `POST /ussd/hubtel` (JSON SessionId, Mobile, Type Initiation/Response/Release/Timeout, Message; reply Type Response/Release, Message, DataType, FieldType), `POST /ussd/nalo` (JSON USERID, MSISDN, USERDATA, MSGTYPE true on first request, NETWORK, SESSIONID; reply MSG max 120 chars, MSGTYPE true=continue), `POST /ussd/arkesel` (JSON sessionID, userID, newSession, msisdn, userData, network; reply message, continueSession, echoing sessionID/userID/msisdn).
+- Flow JSON: `{"start": "<id>", "nodes": {"<id>": {"prompt", "kind": "menu"|"end"|"input", "options": [{"key","label","next"}], "input": {...}, "action": {...}}}}`. Keys are digits. Routing is by screen id.
+- Input screens: `"input": {"name", "type": "text"|"digits"|"amount"|"phone_gh", "next", "min_length", "max_length", "min", "max", "error"}`. Amounts are stored as "10.50"; Ghana phone numbers as "233241234567". Three wrong answers end the session.
+- Prompts can use `{{name}}`; built-ins `{{phone}}` (digits only) and `{{network}}`.
+- Actions: `"action": {"url": "$BACKEND_URL/path", "timeout_ms": 2000, "can_go_to": ["screen"], "error_message": "..."}`. The runtime POSTs JSON {session_id, gateway, phone, network, screen, vars} with `X-USSD-Timestamp` and `X-USSD-Signature: v1=hex(HMAC-SHA256(ACTION_SECRET, timestamp + "." + body))`. Reply `{"vars": {...}}` and/or `{"next": "<screen in can_go_to>"}`. Timeout max 4000 ms.
+- Config: FLOW_FILE, PORT (8080), REDIS_URL (else in-memory, single instance), SESSION_TTL (180s), GATEWAY_TOKEN (?token= on callback URLs), ACTION_SECRET, SIMULATOR=on (phone simulator at /, keep off in production).
+- Flows with no inputs or actions can run without stored sessions on Africa's Talking (replayed from the * history, identical to USSD Flow Studio's exported servers). Flows with actions never replay, so backend calls are never repeated.
+- Measured on a laptop (i7-10850H), 50 concurrent callers, payment flow with two backend calls: about 14,000 to 19,000 requests/s, p99 about 10 ms.
+- Metrics at /metrics, health at /healthz.
+
+## Docs
+
+- [README](https://github.com/Jacksonoseikojo1122/ussd-runtime/blob/main/README.md)
+- [Getting started](https://github.com/Jacksonoseikojo1122/ussd-runtime/blob/main/docs/getting-started.md): run the demo, run a Flow Studio export, add a backend
+- [Flow format](https://github.com/Jacksonoseikojo1122/ussd-runtime/blob/main/docs/flows.md): screens, inputs, variables, actions, checks
+- [Actions](https://github.com/Jacksonoseikojo1122/ussd-runtime/blob/main/docs/actions.md): backend contract and signature verification in Node, Python, PHP and Go
+- [Gateways](https://github.com/Jacksonoseikojo1122/ussd-runtime/blob/main/docs/gateways.md): each gateway's format with links to its documentation
+- [Operations](https://github.com/Jacksonoseikojo1122/ussd-runtime/blob/main/docs/operations.md): load-test results, Redis, Docker, Render, Kubernetes, metrics, alerts
+- [OpenAPI spec](https://github.com/Jacksonoseikojo1122/ussd-runtime/blob/main/openapi.yaml)
+
+## Optional
+
+- [USSD Flow Studio](https://github.com/Jacksonoseikojo1122/nextjs-ussd-flow-studio): design flows visually
+- [Project page](https://jacksonkojoosei.com/projects/ussd-runtime)
+- [Author](https://jacksonkojoosei.com): Jackson Kojo Osei, CTO, Accra, Ghana

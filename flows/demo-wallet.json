@@ -1,0 +1,55 @@
+{
+  "start": "main",
+  "nodes": {
+    "main": {
+      "id": "main",
+      "prompt": "Welcome to Demo Wallet",
+      "kind": "menu",
+      "options": [
+        { "key": "1", "label": "Buy airtime", "next": "airtime_network" },
+        { "key": "2", "label": "Check balance", "next": "balance" },
+        { "key": "3", "label": "Exit", "next": "goodbye" }
+      ]
+    },
+    "airtime_network": {
+      "id": "airtime_network",
+      "prompt": "Buy airtime for which network?",
+      "kind": "menu",
+      "options": [
+        { "key": "1", "label": "MTN", "next": "airtime_amount" },
+        { "key": "2", "label": "Telecel", "next": "airtime_amount" },
+        { "key": "3", "label": "AT", "next": "airtime_amount" },
+        { "key": "0", "label": "Back", "next": "main" }
+      ]
+    },
+    "airtime_amount": {
+      "id": "airtime_amount",
+      "prompt": "Select amount",
+      "kind": "menu",
+      "options": [
+        { "key": "1", "label": "GHS 1", "next": "airtime_done" },
+        { "key": "2", "label": "GHS 5", "next": "airtime_done" },
+        { "key": "3", "label": "GHS 10", "next": "airtime_done" },
+        { "key": "0", "label": "Back", "next": "airtime_network" }
+      ]
+    },
+    "airtime_done": {
+      "id": "airtime_done",
+      "prompt": "Request received. You will get an SMS confirmation shortly.",
+      "kind": "end",
+      "options": []
+    },
+    "balance": {
+      "id": "balance",
+      "prompt": "Your Demo Wallet balance is GHS 120.50.",
+      "kind": "end",
+      "options": []
+    },
+    "goodbye": {
+      "id": "goodbye",
+      "prompt": "Thank you for using Demo Wallet.",
+      "kind": "end",
+      "options": []
+    }
+  }
+}

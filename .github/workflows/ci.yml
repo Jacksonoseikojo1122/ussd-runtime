@@ -1,0 +1,55 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - name: Tests with the race detector, including the store tests on a real Redis
+        run: go test -race ./...
+        env:
+          TEST_REDIS_URL: redis://localhost:6379/0
+      - run: docker build -t ussd-runtime .
+
+  load-test:
+    # Real numbers on a GitHub runner, with sessions in Redis and a backend call on two screens.
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build -o bin/ ./cmd/... ./examples/...
+      - name: Start the demo backend and the runtime
+        run: |
+          ACTION_SECRET=ci PORT=9090 bin/demo-backend > backend.log 2>&1 &
+          REDIS_URL=redis://localhost:6379/0 FLOW_FILE=flows/school-fees.json BACKEND_URL=http://localhost:9090 \
+            ACTION_SECRET=ci PORT=8080 bin/ussd-runtime > runtime.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:8080/healthz && break; sleep 1; done
+      - name: Load test
+        run: |
+          {
+            echo "### Load test: school-fees payment flow, Redis sessions, 50 callers, 20s per gateway"
+            echo
+            bin/loadtest -gateway africastalking -c 50 -d 20s -keys 1,1001,1,250,1
+            for gw in hubtel nalo arkesel; do bin/loadtest -gateway $gw -c 50 -d 20s -keys 1,1001,1,250,1 | tail -1; done
+          } | tee -a "$GITHUB_STEP_SUMMARY"

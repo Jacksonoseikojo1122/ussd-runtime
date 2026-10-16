@@ -1,0 +1,18 @@
+# Free Render web service. Sessions need Redis once you run more than one instance:
+# a free Upstash Redis URL in REDIS_URL works. Set FLOW_FILE to your own flow
+# (add it to the image, or mount it as a Secret File at /etc/secrets/flow.json).
+services:
+  - type: web
+    name: ussd-runtime
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: REDIS_URL
+        sync: false
+      - key: GATEWAY_TOKEN
+        generateValue: true
+      - key: ACTION_SECRET
+        generateValue: true
+      - key: FLOW_FILE
+        value: /flows/demo-wallet.json

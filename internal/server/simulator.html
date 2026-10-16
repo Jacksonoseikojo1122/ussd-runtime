@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>USSD Runtime simulator</title>
+<style>
+  :root { --bg:#eef0ec; --ink:#1d1d1b; --muted:#6b6a64; --phone:#1e2124; --screen:#cfe3c6; --lcd:#14301c; --accent:#0b6e4f; --warn:#8a5a00; --warnbg:#fff6e0; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 28px 16px 48px; display:grid; grid-template-columns: 340px 1fr; gap: 28px; align-items:start; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  .phone { background: var(--phone); border-radius: 34px; padding: 26px 20px 22px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .speaker { width: 60px; height: 6px; border-radius: 3px; background:#444; margin: 0 auto 18px; }
+  .screen { background: var(--screen); color: var(--lcd); border-radius: 8px; min-height: 230px; padding: 14px; font: 15px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  .screen .ended { display:block; margin-top: 10px; font-size: 12px; opacity:.7; }
+  .row { display:flex; gap: 8px; margin-top: 14px; }
+  input { flex:1; padding: 10px 12px; border-radius: 8px; border: 0; font: inherit; }
+  button { padding: 10px 14px; border-radius: 8px; border: 0; font: inherit; font-weight: 600; cursor: pointer; }
+  .send { background: var(--accent); color: #fff; }
+  .dial { background: #3b8f4a; color:#fff; width: 100%; margin-top: 10px; }
+  .hang { background: #b33a3a; color:#fff; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  .log { font: 13px/1.5 ui-monospace, Consolas, monospace; background: #fff; border-radius: 8px; padding: 10px 12px; max-height: 300px; overflow:auto; }
+  .log div { border-bottom: 1px solid #eee; padding: 3px 0; }
+  .warn { background: var(--warnbg); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 8px; }
+  code { background:#fff; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <section class="phone" aria-label="Simulated phone">
+    <div class="speaker"></div>
+    <div class="screen" id="screen" aria-live="polite">Press Dial to start a session.</div>
+    <form class="row" id="f">
+      <input id="input" inputmode="numeric" autocomplete="off" placeholder="Reply" aria-label="Your reply" disabled>
+      <button class="send" id="send" disabled>Send</button>
+      <button class="hang" id="hang" type="button" title="End session">✕</button>
+    </form>
+    <button class="dial" id="dial" type="button">Dial</button>
+  </section>
+  <section>
+    <h1>USSD Runtime simulator</h1>
+    <p>This drives the loaded flow through the same runtime and session store that the gateways use, so what you see here is what callers see. Turn it off in production (<code>SIMULATOR=off</code>).</p>
+    {{range .Problems}}<div class="warn">{{.Message}}</div>{{end}}
+    <h2 style="font-size:15px;margin:18px 0 6px">Requests</h2>
+    <div class="log" id="log"></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let session = null;
+
+function show(reply, ms) {
+  const scr = $("screen");
+  scr.textContent = reply.message;
+  if (reply.end) {
+    const e = document.createElement("span");
+    e.className = "ended";
+    e.textContent = "Session ended";
+    scr.append(e);
+    session = null;
+  }
+  $("input").disabled = $("send").disabled = !session;
+  $("input").inputMode = reply.input_type === "text" ? "text" : "numeric";
+  const line = document.createElement("div");
+  line.textContent = `${reply.end ? "END" : "CON"}  ${reply.screen || "(runtime)"}  ${ms < 1 ? "< 1 ms" : ms.toFixed(1) + " ms"}`;
+  $("log").prepend(line);
+  if (session) $("input").focus();
+}
+
+async function send(input, isNew) {
+  const res = await fetch("/sim", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session_id: session, input, new: isNew }),
+  });
+  const body = await res.json();
+  show(body.reply, body.ms);
+}
+
+$("dial").onclick = () => { session = "sim-" + Math.random().toString(36).slice(2); send("", true); };
+$("f").onsubmit = (e) => { e.preventDefault(); const v = $("input").value; $("input").value = ""; if (session) send(v, false); };
+$("hang").onclick = () => { session = null; $("screen").textContent = "Press Dial to start a session."; $("input").disabled = $("send").disabled = true; };
+</script>
+</body>
+</html>
